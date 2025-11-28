@@ -10,7 +10,7 @@
     <div class="container">
         <header>
             <h1>🚨 SOS Emergency App</h1>
-            <p class="subtitle">AI-Powered Situation Assessment POC</p>
+            <p class="subtitle">Multi-Agent AI Emergency Assessment System</p>
         </header>
 
         <main>
@@ -44,7 +44,8 @@
 
                 <div id="loading" class="loading" style="display: none;">
                     <div class="spinner"></div>
-                    <p>Analyzing situation with AI...</p>
+                    <p>Multi-agent assessment in progress...</p>
+                    <p class="loading-detail">Supervisor → Situation → Guidance → Resources</p>
                 </div>
             </section>
 
@@ -72,6 +73,18 @@
                         <div class="detail-group">
                             <h3>📝 Step-by-Step Guidance</h3>
                             <ol id="guidance-list"></ol>
+                        </div>
+
+                        <div id="resources-section" class="detail-group" style="display: none;">
+                            <h3>🏥 Emergency Resources</h3>
+                            <p><strong>Emergency Services:</strong> <span id="emergency-services"></span></p>
+                            <div id="hospitals-list"></div>
+                        </div>
+
+                        <div id="multi-agent-info" class="multi-agent-info" style="display: none;">
+                            <h4>🤖 Multi-Agent Assessment</h4>
+                            <p><strong>Agents Called:</strong> <span id="agents-called"></span></p>
+                            <p><strong>Execution Time:</strong> <span id="execution-time"></span></p>
                         </div>
 
                         <div class="meta-info">

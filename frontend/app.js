@@ -108,6 +108,35 @@ function displayAssessment(emergency, warning) {
         });
     }
 
+    // Populate emergency resources (multi-agent)
+    if (assessment.nearbyHospitals && assessment.nearbyHospitals.length > 0) {
+        const resourcesSection = document.getElementById('resources-section');
+        resourcesSection.style.display = 'block';
+
+        document.getElementById('emergency-services').textContent = assessment.emergencyServices || '911';
+
+        const hospitalsList = document.getElementById('hospitals-list');
+        hospitalsList.innerHTML = '<p><strong>Nearby Resources:</strong></p><ul></ul>';
+        const ul = hospitalsList.querySelector('ul');
+        assessment.nearbyHospitals.forEach(hospital => {
+            const li = document.createElement('li');
+            li.textContent = hospital;
+            ul.appendChild(li);
+        });
+    }
+
+    // Populate multi-agent information
+    if (assessment.multiAgent && assessment.agentsCalled) {
+        const multiAgentInfo = document.getElementById('multi-agent-info');
+        multiAgentInfo.style.display = 'block';
+
+        const agentsText = assessment.agentsCalled
+            .map(agent => agent.replace('_agent', '').replace('_', ' '))
+            .join(', ');
+        document.getElementById('agents-called').textContent = agentsText;
+        document.getElementById('execution-time').textContent = `${assessment.executionTime}s`;
+    }
+
     // Populate meta information
     document.getElementById('emergency-id').textContent = emergency.id;
     document.getElementById('ai-model').textContent = assessment.aiModel || 'Unknown';

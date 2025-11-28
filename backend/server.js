@@ -1,47 +1,42 @@
 require('dotenv').config({ path: '../.env' });
 const express = require('express');
 const cors = require('cors');
-const OpenAI = require('openai');
+const axios = require('axios');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-
-// Initialize OpenRouter client (using OpenAI SDK)
-const openai = new OpenAI({
-  apiKey: process.env.OPENROUTER_API_KEY,
-  baseURL: 'https://openrouter.ai/api/v1',
-  defaultHeaders: {
-    'HTTP-Referer': process.env.SITE_URL || 'http://localhost:3000',
-    'X-Title': 'SOS Emergency App',
-  }
-});
+const PYTHON_SERVICE_URL = process.env.PYTHON_SERVICE_URL || 'http://localhost:8000';
 
 // Middleware
 app.use(cors());
 app.use(express.json());
 app.use(express.static('../frontend'));
 
-// System prompt for situation assessment
-const SITUATION_ASSESSMENT_PROMPT = `You are an emergency situation assessment specialist.
-Analyze the user's emergency description and provide:
-1. Emergency type (medical, security, natural disaster, accident, other)
-2. Severity level (1-5, where 5 is life-threatening)
-3. Immediate risks
-4. Recommended response (self-help, contact help, call 911)
-
-Be concise, clear, and prioritize user safety.
-Respond in JSON format with these fields:
-{
-  "emergencyType": "string",
-  "severityLevel": number,
-  "immediateRisks": ["string"],
-  "recommendedResponse": "string",
-  "guidance": ["step 1", "step 2", "step 3"]
-}`;
-
 // Health check endpoint
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', message: 'SOS App Backend is running' });
+app.get('/api/health', async (req, res) => {
+  try {
+    // Check Python service health
+    const pythonHealth = await axios.get(`${PYTHON_SERVICE_URL}/health`);
+
+    res.json({
+      status: 'ok',
+      message: 'SOS App Backend is running',
+      pythonService: {
+        status: 'connected',
+        version: pythonHealth.data.version,
+        model: pythonHealth.data.model
+      }
+    });
+  } catch (error) {
+    res.json({
+      status: 'ok',
+      message: 'SOS App Backend is running',
+      pythonService: {
+        status: 'disconnected',
+        error: 'Multi-agent service unavailable'
+      }
+    });
+  }
 });
 
 // Emergency trigger endpoint with AI assessment
@@ -56,10 +51,11 @@ app.post('/api/emergency/trigger', async (req, res) => {
       });
     }
 
-    console.log('Emergency triggered:', { description, location });
+    console.log('🚨 Emergency triggered:', { description, location });
+    console.log('📡 Calling Python multi-agent service...');
 
-    // Call OpenAI for situation assessment
-    const assessment = await assessSituation(description, location);
+    // Call Python multi-agent service
+    const assessment = await assessWithMultiAgent(description, location);
 
     // Create emergency session
     const emergency = {
@@ -71,12 +67,14 @@ app.post('/api/emergency/trigger', async (req, res) => {
       status: 'active'
     };
 
-    console.log('Assessment completed:', assessment);
+    console.log('✅ Multi-agent assessment completed');
+    console.log(`🤖 Agents called: ${assessment.agentsCalled?.join(', ')}`);
+    console.log(`⏱️  Total time: ${assessment.executionTime}s`);
 
     res.json({
       success: true,
       emergency,
-      message: 'Emergency alert created successfully'
+      message: 'Emergency alert created with multi-agent assessment'
     });
 
   } catch (error) {
@@ -101,39 +99,50 @@ app.post('/api/emergency/trigger', async (req, res) => {
   }
 });
 
-// AI Situation Assessment Function
-async function assessSituation(description, location) {
+// Multi-Agent Assessment Function - Calls Python service
+async function assessWithMultiAgent(description, location) {
   try {
-    const completion = await openai.chat.completions.create({
-      model: "deepseek/deepseek-chat",
-      messages: [
-        {
-          role: "system",
-          content: SITUATION_ASSESSMENT_PROMPT
-        },
-        {
-          role: "user",
-          content: `Emergency description: ${description}\nLocation: ${location || 'Unknown'}`
-        }
-      ],
-      temperature: 0.3,
-      max_tokens: 500,
-      response_format: { type: "json_object" }
+    const startTime = Date.now();
+
+    // Call Python multi-agent service
+    const response = await axios.post(`${PYTHON_SERVICE_URL}/assess-multi`, {
+      description,
+      location
+    }, {
+      timeout: 60000 // 60 second timeout for multi-agent processing
     });
 
-    const assessmentText = completion.choices[0].message.content;
-    const assessment = JSON.parse(assessmentText);
+    const data = response.data;
 
+    // Transform multi-agent response to match frontend expectations
     return {
-      ...assessment,
-      aiModel: 'deepseek-chat',
-      aiProvider: 'OpenRouter',
-      tokensUsed: completion.usage.total_tokens,
-      generatedAt: new Date().toISOString()
+      // From Situation Agent
+      emergencyType: data.assessment.emergency_type,
+      severityLevel: data.assessment.severity,
+      immediateRisks: data.assessment.immediate_risks,
+      recommendedResponse: data.assessment.recommended_response,
+
+      // From Guidance Agent
+      guidance: data.guidance.steps,
+
+      // From Resource Agent
+      nearbyHospitals: data.resources.nearby_hospitals,
+      emergencyServices: data.resources.emergency_services,
+
+      // Meta information
+      aiModel: data.orchestration.model,
+      aiProvider: data.orchestration.provider,
+      tokensUsed: 0, // Not tracking in current implementation
+      generatedAt: new Date().toISOString(),
+
+      // Multi-agent specific
+      agentsCalled: data.orchestration.agents_called,
+      executionTime: ((Date.now() - startTime) / 1000).toFixed(2),
+      multiAgent: true
     };
 
   } catch (error) {
-    console.error('OpenRouter API error:', error);
+    console.error('❌ Python service error:', error.message);
     throw error;
   }
 }
@@ -163,9 +172,17 @@ function generateId() {
 }
 
 // Start server
-app.listen(PORT, () => {
-  console.log(`🚨 SOS App Backend running on http://localhost:${PORT}`);
+app.listen(PORT, async () => {
+  console.log(`🚨 SOS App Backend (Node.js Gateway) running on http://localhost:${PORT}`);
   console.log(`📊 Health check: http://localhost:${PORT}/api/health`);
-  console.log(`🤖 OpenRouter API Key configured: ${process.env.OPENROUTER_API_KEY ? 'Yes' : 'No'}`);
-  console.log(`🧠 AI Model: DeepSeek Chat via OpenRouter`);
+  console.log(`🐍 Python Service URL: ${PYTHON_SERVICE_URL}`);
+  console.log(`🤖 Multi-Agent System: Supervisor + 3 Specialists`);
+
+  // Check Python service connection
+  try {
+    const health = await axios.get(`${PYTHON_SERVICE_URL}/health`, { timeout: 5000 });
+    console.log(`✅ Python service connected: ${health.data.service} v${health.data.version}`);
+  } catch (error) {
+    console.log(`⚠️  Python service not available - start it with: docker run -d --name sos-agents -p 8000:8000 --env-file .env -e VERIFY_SSL=false sos-agents:latest`);
+  }
 });

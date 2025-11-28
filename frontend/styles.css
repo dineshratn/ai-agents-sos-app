@@ -263,3 +263,47 @@ footer strong {
         flex-direction: column;
     }
 }
+
+/* Multi-Agent specific styles */
+.multi-agent-info {
+    background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%);
+    border: 2px solid #667eea;
+    border-radius: 12px;
+    padding: 20px;
+    margin-top: 20px;
+}
+
+.multi-agent-info h4 {
+    color: #667eea;
+    margin-bottom: 12px;
+    font-size: 1.1rem;
+}
+
+.multi-agent-info p {
+    margin: 8px 0;
+    color: #555;
+}
+
+.loading-detail {
+    font-size: 0.9rem;
+    color: #666;
+    margin-top: 10px;
+    font-style: italic;
+}
+
+#resources-section {
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: 12px;
+    margin-top: 20px;
+}
+
+#resources-section ul {
+    list-style-position: inside;
+    margin-top: 10px;
+}
+
+#resources-section li {
+    padding: 5px 0;
+    color: #555;
+}
