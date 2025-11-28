@@ -111,6 +111,7 @@ function displayAssessment(emergency, warning) {
     // Populate meta information
     document.getElementById('emergency-id').textContent = emergency.id;
     document.getElementById('ai-model').textContent = assessment.aiModel || 'Unknown';
+    document.getElementById('ai-provider').textContent = assessment.aiProvider || 'Unknown';
     document.getElementById('triggered-at').textContent = new Date(emergency.triggeredAt).toLocaleString();
 
     // Show warning if using fallback

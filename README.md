@@ -2,11 +2,11 @@
 
 ## Overview
 
-A proof-of-concept emergency response application that demonstrates AI-powered situation assessment using OpenAI's GPT-4. This is a learning project focused on understanding AI/LLM integration patterns.
+A proof-of-concept emergency response application that demonstrates AI-powered situation assessment using DeepSeek Chat via OpenRouter. This is a learning project focused on understanding AI/LLM integration patterns.
 
 **Features:**
 - Emergency trigger interface
-- AI-powered situation assessment using OpenAI GPT-4o-mini
+- AI-powered situation assessment using DeepSeek Chat (via OpenRouter)
 - Real-time emergency type classification
 - Severity level analysis (1-5 scale)
 - Step-by-step safety guidance
@@ -15,7 +15,7 @@ A proof-of-concept emergency response application that demonstrates AI-powered s
 **Tech Stack:**
 - **Backend:** Node.js + Express
 - **Frontend:** HTML5 + CSS3 + Vanilla JavaScript
-- **AI:** OpenAI GPT-4o-mini API
+- **AI:** DeepSeek Chat via OpenRouter API
 
 ## Prerequisites
 
@@ -23,7 +23,10 @@ Before you begin, ensure you have the following installed:
 
 - **Node.js** (v18 or higher) - [Download here](https://nodejs.org/)
 - **npm** (comes with Node.js)
-- **OpenAI API Key** - [Get one here](https://platform.openai.com/api-keys)
+- **OpenRouter API Key** - [Get one here](https://openrouter.ai/keys)
+
+**Why OpenRouter?**
+OpenRouter provides a unified API to access multiple AI models (including DeepSeek, GPT-4, Claude, etc.) with pay-as-you-go pricing and no subscriptions required.
 
 ## Installation
 
@@ -54,10 +57,11 @@ cd ..
 cp .env.example .env
 ```
 
-Edit `.env` and add your OpenAI API key:
+Edit `.env` and add your OpenRouter API key:
 
 ```env
-OPENAI_API_KEY=sk-your-actual-api-key-here
+OPENROUTER_API_KEY=sk-or-v1-your-actual-api-key-here
+SITE_URL=http://localhost:3000
 PORT=3000
 NODE_ENV=development
 ```
@@ -77,7 +81,8 @@ Expected output:
 ```
 🚨 SOS App Backend running on http://localhost:3000
 📊 Health check: http://localhost:3000/api/health
-🤖 OpenAI API Key configured: Yes
+🤖 OpenRouter API Key configured: Yes
+🧠 AI Model: DeepSeek Chat via OpenRouter
 ```
 
 ### Access the Frontend
@@ -293,21 +298,23 @@ If the OpenAI API fails (network issues, rate limits, invalid API key), the back
 
 ## Cost Estimation
 
-**OpenAI API Costs (as of Nov 2025):**
+**DeepSeek via OpenRouter Costs (as of Nov 2025):**
 
 | Model | Input (per 1M tokens) | Output (per 1M tokens) |
 |-------|----------------------|------------------------|
-| gpt-4o-mini | $0.15 | $0.60 |
+| DeepSeek Chat | $0.27 | $1.10 |
 
 **Typical Request:**
 - Input tokens: ~150-200
 - Output tokens: ~200-300
-- Cost per request: ~$0.0002 (less than a penny)
+- Cost per request: ~$0.0004 (less than a penny)
 
 **Example Monthly Usage:**
-- 100 emergencies/month = ~$0.02
-- 1,000 emergencies/month = ~$0.20
-- 10,000 emergencies/month = ~$2.00
+- 100 emergencies/month = ~$0.04
+- 1,000 emergencies/month = ~$0.40
+- 10,000 emergencies/month = ~$4.00
+
+**Note:** DeepSeek is one of the most cost-effective models on OpenRouter. You can easily switch to other models like GPT-4, Claude, or Llama by changing the model name in `backend/server.js`.
 
 ## Troubleshooting
 
@@ -348,34 +355,44 @@ PORT=3001
 # Restart backend and access frontend at http://localhost:3001
 ```
 
-### OpenAI API Errors
+### OpenRouter API Errors
 
 **Error 401: Invalid API Key**
-- Verify your API key in `.env` file
+- Verify your API key in `.env` file (should start with `sk-or-v1-`)
 - Ensure no extra spaces or quotes
-- Check API key is active on OpenAI dashboard
+- Check API key is active on [OpenRouter Dashboard](https://openrouter.ai/keys)
+
+**Error 402: Insufficient Credits**
+- Add credits to your OpenRouter account
+- Visit [OpenRouter Credits](https://openrouter.ai/credits)
 
 **Error 429: Rate Limit Exceeded**
-- You've exceeded OpenAI's rate limits
+- You've exceeded OpenRouter's rate limits
 - Wait a few minutes and try again
-- Consider upgrading your OpenAI plan
+- Check your usage on OpenRouter dashboard
 
 **Error 500: Model not available**
-- The model might be temporarily unavailable
-- Try changing model in `server.js`:
+- DeepSeek might be temporarily unavailable
+- Try changing model in `server.js` line 108:
 ```javascript
-model: "gpt-3.5-turbo"  // Fallback model
+model: "meta-llama/llama-3.1-8b-instruct:free"  // Free model fallback
+// OR
+model: "openai/gpt-4o-mini"  // Switch to GPT-4o-mini
+// OR
+model: "anthropic/claude-3-haiku"  // Switch to Claude
 ```
+
+**View all available models:** https://openrouter.ai/docs#models
 
 ## Learning Resources
 
 ### Understanding the Code
 
 **Backend (`server.js`):**
-- Line 12-20: OpenAI client initialization
+- Line 10-17: OpenRouter client initialization with DeepSeek
 - Line 23-42: AI prompt engineering for situation assessment
-- Line 67-96: OpenAI API integration
-- Line 98-111: Fallback mechanism
+- Line 107-122: OpenRouter API integration
+- Line 141-157: Fallback mechanism
 
 **Frontend (`app.js`):**
 - Line 18-59: Emergency trigger handler
@@ -385,10 +402,15 @@ model: "gpt-3.5-turbo"  // Fallback model
 ### Next Steps
 
 1. **Experiment with AI prompts** in `server.js` lines 23-42
-2. **Add more emergency types** and specific guidance
-3. **Implement emergency contact notifications** (Option B)
-4. **Add user authentication** for persistent emergency history
-5. **Containerize with Docker** for easier deployment
+2. **Try different AI models** - Change model in `server.js` line 108:
+   - `deepseek/deepseek-chat` (current - fast & cheap)
+   - `openai/gpt-4o-mini` (OpenAI's latest)
+   - `anthropic/claude-3-haiku` (Anthropic's fastest)
+   - `meta-llama/llama-3.1-8b-instruct:free` (FREE!)
+3. **Add more emergency types** and specific guidance
+4. **Implement emergency contact notifications** (Option B)
+5. **Add user authentication** for persistent emergency history
+6. **Containerize with Docker** for easier deployment
 
 ## Security Notes
 

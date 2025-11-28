@@ -6,9 +6,14 @@ const OpenAI = require('openai');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Initialize OpenAI
+// Initialize OpenRouter client (using OpenAI SDK)
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+  apiKey: process.env.OPENROUTER_API_KEY,
+  baseURL: 'https://openrouter.ai/api/v1',
+  defaultHeaders: {
+    'HTTP-Referer': process.env.SITE_URL || 'http://localhost:3000',
+    'X-Title': 'SOS Emergency App',
+  }
 });
 
 // Middleware
@@ -100,7 +105,7 @@ app.post('/api/emergency/trigger', async (req, res) => {
 async function assessSituation(description, location) {
   try {
     const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: "deepseek/deepseek-chat",
       messages: [
         {
           role: "system",
@@ -121,13 +126,14 @@ async function assessSituation(description, location) {
 
     return {
       ...assessment,
-      aiModel: 'gpt-4o-mini',
+      aiModel: 'deepseek-chat',
+      aiProvider: 'OpenRouter',
       tokensUsed: completion.usage.total_tokens,
       generatedAt: new Date().toISOString()
     };
 
   } catch (error) {
-    console.error('OpenAI API error:', error);
+    console.error('OpenRouter API error:', error);
     throw error;
   }
 }
@@ -160,5 +166,6 @@ function generateId() {
 app.listen(PORT, () => {
   console.log(`🚨 SOS App Backend running on http://localhost:${PORT}`);
   console.log(`📊 Health check: http://localhost:${PORT}/api/health`);
-  console.log(`🤖 OpenAI API Key configured: ${process.env.OPENAI_API_KEY ? 'Yes' : 'No'}`);
+  console.log(`🤖 OpenRouter API Key configured: ${process.env.OPENROUTER_API_KEY ? 'Yes' : 'No'}`);
+  console.log(`🧠 AI Model: DeepSeek Chat via OpenRouter`);
 });
