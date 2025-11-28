@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SOS Emergency App - POC</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🚨 SOS Emergency App</h1>
+            <p class="subtitle">AI-Powered Situation Assessment POC</p>
+        </header>
+
+        <main>
+            <!-- Emergency Trigger Section -->
+            <section class="trigger-section">
+                <h2>Emergency Trigger</h2>
+
+                <div class="form-group">
+                    <label for="emergency-description">Describe your emergency:</label>
+                    <textarea
+                        id="emergency-description"
+                        rows="4"
+                        placeholder="E.g., I'm experiencing chest pain and difficulty breathing"
+                        required
+                    ></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label for="location">Your location (optional):</label>
+                    <input
+                        type="text"
+                        id="location"
+                        placeholder="E.g., 123 Main St, City, State"
+                    >
+                </div>
+
+                <button id="trigger-sos" class="sos-button">
+                    <span class="button-text">Trigger SOS</span>
+                    <span class="button-icon">🆘</span>
+                </button>
+
+                <div id="loading" class="loading" style="display: none;">
+                    <div class="spinner"></div>
+                    <p>Analyzing situation with AI...</p>
+                </div>
+            </section>
+
+            <!-- Assessment Results Section -->
+            <section id="assessment-section" class="assessment-section" style="display: none;">
+                <h2>AI Situation Assessment</h2>
+
+                <div class="assessment-card">
+                    <div class="assessment-header">
+                        <span id="emergency-type" class="badge"></span>
+                        <span id="severity-level" class="severity-badge"></span>
+                    </div>
+
+                    <div class="assessment-details">
+                        <div class="detail-group">
+                            <h3>⚠️ Immediate Risks</h3>
+                            <ul id="risks-list"></ul>
+                        </div>
+
+                        <div class="detail-group">
+                            <h3>📋 Recommended Response</h3>
+                            <p id="recommended-response"></p>
+                        </div>
+
+                        <div class="detail-group">
+                            <h3>📝 Step-by-Step Guidance</h3>
+                            <ol id="guidance-list"></ol>
+                        </div>
+
+                        <div class="meta-info">
+                            <p><strong>Emergency ID:</strong> <span id="emergency-id"></span></p>
+                            <p><strong>AI Model:</strong> <span id="ai-model"></span></p>
+                            <p><strong>Triggered At:</strong> <span id="triggered-at"></span></p>
+                        </div>
+                    </div>
+
+                    <button id="new-emergency" class="secondary-button">
+                        Create New Emergency
+                    </button>
+                </div>
+            </section>
+
+            <!-- Error Section -->
+            <section id="error-section" class="error-section" style="display: none;">
+                <div class="error-card">
+                    <h3>❌ Error</h3>
+                    <p id="error-message"></p>
+                    <button id="retry-button" class="secondary-button">Try Again</button>
+                </div>
+            </section>
+        </main>
+
+        <footer>
+            <p>POC Version 1.0 | Learning Project | Not for actual emergencies</p>
+            <p>For real emergencies, call <strong>911</strong></p>
+        </footer>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
