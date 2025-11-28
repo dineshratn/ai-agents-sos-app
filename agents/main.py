@@ -9,7 +9,7 @@ from openai import OpenAI
 import httpx
 
 from config import Config
-from models import EmergencyRequest, SingleAgentResponse
+from models import EmergencyRequest, SingleAgentResponse, MultiAgentResponse
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -134,19 +134,117 @@ async def assess_emergency(request: EmergencyRequest):
         )
 
 
+@app.post("/assess-multi", response_model=MultiAgentResponse)
+async def assess_emergency_multi_agent(request: EmergencyRequest):
+    """
+    Assess an emergency using multi-agent orchestration (Phase 2).
+
+    This endpoint uses LangGraph to coordinate 4 specialized agents:
+    - Supervisor: Routes to appropriate specialists
+    - Situation Agent: Analyzes type, severity, and risks
+    - Guidance Agent: Provides step-by-step instructions
+    - Resource Agent: Coordinates nearby resources
+
+    Returns comprehensive assessment from all agents.
+    """
+    try:
+        from graph_builder import emergency_graph
+        from state import AgentNames
+        from models import Assessment, Guidance, Resource, AgentOrchestration
+
+        start_time = time.time()
+        print(f"\n{'='*60}")
+        print(f"🚨 MULTI-AGENT ASSESSMENT STARTED")
+        print(f"{'='*60}")
+
+        # Initialize state
+        initial_state = {
+            "description": request.description,
+            "location": request.location,
+            "agents_called": [],
+            "assessment_complete": False,
+            "total_tokens": 0,
+            "messages": []
+        }
+
+        # Run the multi-agent workflow
+        print(f"🎯 Running LangGraph workflow...")
+        final_state = emergency_graph.invoke(initial_state)
+
+        # Build response from final state
+        assessment = Assessment(
+            emergency_type=final_state.get('emergency_type', 'unknown'),
+            severity=final_state.get('severity', 3),
+            immediate_risks=final_state.get('immediate_risks', []),
+            recommended_response=final_state.get('recommended_response', 'contact_help')
+        )
+
+        guidance = Guidance(
+            steps=final_state.get('guidance_steps', []),
+            provided_by=AgentNames.GUIDANCE
+        )
+
+        resources = Resource(
+            nearby_hospitals=final_state.get('nearby_hospitals'),
+            emergency_services=final_state.get('emergency_services', '911'),
+            provided_by=AgentNames.RESOURCE
+        )
+
+        execution_time = time.time() - start_time
+        orchestration = AgentOrchestration(
+            agents_called=final_state.get('agents_called', []),
+            total_time=execution_time,
+            model=Config.MODEL_NAME,
+            provider="OpenRouter"
+        )
+
+        response = MultiAgentResponse(
+            assessment=assessment,
+            guidance=guidance,
+            resources=resources,
+            orchestration=orchestration
+        )
+
+        print(f"\n{'='*60}")
+        print(f"✅ MULTI-AGENT ASSESSMENT COMPLETE")
+        print(f"{'='*60}")
+        print(f"⏱️  Total execution time: {execution_time:.2f}s")
+        print(f"🤖 Agents called: {', '.join(final_state.get('agents_called', []))}")
+        print(f"📊 Total tokens used: {final_state.get('total_tokens', 0)}")
+        print(f"{'='*60}\n")
+
+        return response
+
+    except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"❌ Error during multi-agent assessment: {str(e)}")
+        print(f"📋 Traceback: {error_details}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to assess emergency with multi-agent system: {str(e)}"
+        )
+
+
 @app.get("/")
 async def root():
     """Root endpoint with API information."""
     return {
         "message": "SOS Multi-Agent Emergency Assessment System",
-        "version": "1.0.0",
+        "version": "2.0.0",
         "endpoints": {
-            "health": "/health",
-            "assess": "/assess (POST)",
+            "health": "/health (GET)",
+            "assess": "/assess (POST) - Single agent",
+            "assess_multi": "/assess-multi (POST) - Multi-agent orchestration",
             "docs": "/docs"
         },
-        "phase": "Phase 1: Single Agent",
-        "next": "Phase 2: Multi-Agent with LangGraph"
+        "phase": "Phase 2: Multi-Agent with LangGraph ✅",
+        "features": [
+            "Single-agent emergency assessment",
+            "Multi-agent orchestration with LangGraph",
+            "Supervisor routing pattern",
+            "Specialized agents: Situation, Guidance, Resource"
+        ]
     }
 
 
