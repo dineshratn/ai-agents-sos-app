@@ -1,13 +1,15 @@
 """LangGraph workflow builder - orchestrates multi-agent emergency assessment."""
 from langgraph.graph import StateGraph, END
+from langgraph.checkpoint.memory import MemorySaver
 from state import EmergencyState, AgentNames
 from supervisor import supervisor_agent, route_to_next_agent
 from situation_agent import situation_agent
 from guidance_agent import guidance_agent
 from resource_agent import resource_agent
+from logger import logger
 
 
-def build_emergency_assessment_graph():
+def build_emergency_assessment_graph(with_checkpointing: bool = True):
     """
     Build the LangGraph workflow for multi-agent emergency assessment.
 
@@ -18,8 +20,11 @@ def build_emergency_assessment_graph():
     4. Supervisor → Resource Agent (coordinate resources)
     5. End → Return complete assessment
 
+    Args:
+        with_checkpointing: Enable conversation history with MemorySaver (Phase 4)
+
     Returns:
-        Compiled LangGraph application
+        Compiled LangGraph application with optional checkpointing
     """
     # Create the graph with our state schema
     workflow = StateGraph(EmergencyState)
@@ -50,14 +55,20 @@ def build_emergency_assessment_graph():
     workflow.add_edge(AgentNames.GUIDANCE, AgentNames.SUPERVISOR)
     workflow.add_edge(AgentNames.RESOURCE, AgentNames.SUPERVISOR)
 
-    # Compile the graph
-    app = workflow.compile()
+    # Phase 4: Compile with checkpointing for conversation history
+    if with_checkpointing:
+        checkpointer = MemorySaver()
+        app = workflow.compile(checkpointer=checkpointer)
+        logger.logger.info("✅ Multi-agent workflow compiled with CHECKPOINTING enabled")
+        logger.logger.info("💾 Conversation history will be preserved across requests")
+    else:
+        app = workflow.compile()
+        logger.logger.info("✅ Multi-agent workflow compiled (stateless mode)")
 
-    print("✅ Multi-agent workflow compiled successfully")
-    print("📊 Workflow: Supervisor → Situation → Guidance → Resource → End")
+    logger.logger.info("📊 Workflow: Supervisor → Situation → Guidance → Resource → End")
 
     return app
 
 
-# Create and export the compiled graph
-emergency_graph = build_emergency_assessment_graph()
+# Create and export the compiled graph (with checkpointing enabled by default)
+emergency_graph = build_emergency_assessment_graph(with_checkpointing=True)

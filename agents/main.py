@@ -137,7 +137,7 @@ async def assess_emergency(request: EmergencyRequest):
 @app.post("/assess-multi", response_model=MultiAgentResponse)
 async def assess_emergency_multi_agent(request: EmergencyRequest):
     """
-    Assess an emergency using multi-agent orchestration (Phase 2).
+    Assess an emergency using multi-agent orchestration (Phase 4 Enhanced).
 
     This endpoint uses LangGraph to coordinate 4 specialized agents:
     - Supervisor: Routes to appropriate specialists
@@ -145,49 +145,73 @@ async def assess_emergency_multi_agent(request: EmergencyRequest):
     - Guidance Agent: Provides step-by-step instructions
     - Resource Agent: Coordinates nearby resources
 
+    Phase 4 Enhancements:
+    - Conversation history with thread_id
+    - Agent confidence scores
+    - Detailed execution metrics
+    - Structured logging
+    - Dynamic routing
+
     Returns comprehensive assessment from all agents.
     """
     try:
         from graph_builder import emergency_graph
         from state import AgentNames
-        from models import Assessment, Guidance, Resource, AgentOrchestration
+        from models import Assessment, Guidance, Resource, AgentOrchestration, ExecutionMetrics
+        from logger import log_workflow_started, log_workflow_completed
+        import uuid
 
         start_time = time.time()
-        print(f"\n{'='*60}")
-        print(f"🚨 MULTI-AGENT ASSESSMENT STARTED")
-        print(f"{'='*60}")
 
-        # Initialize state
+        # Phase 4: Generate unique workflow ID
+        workflow_id = str(uuid.uuid4())
+        thread_id = request.thread_id or str(uuid.uuid4())
+
+        # Phase 4: Structured logging
+        log_workflow_started(workflow_id, {
+            "description": request.description[:100],
+            "location": request.location,
+            "thread_id": thread_id
+        })
+
+        # Initialize state with Phase 4 fields
         initial_state = {
             "description": request.description,
             "location": request.location,
+            "thread_id": thread_id,
+            "workflow_id": workflow_id,
             "agents_called": [],
             "assessment_complete": False,
             "total_tokens": 0,
-            "messages": []
+            "messages": [],
+            "execution_trace": [],
+            "performance_metrics": {}
         }
 
-        # Run the multi-agent workflow
-        print(f"🎯 Running LangGraph workflow...")
-        final_state = emergency_graph.invoke(initial_state)
+        # Run the multi-agent workflow with thread_id for checkpointing
+        config = {"configurable": {"thread_id": thread_id}}
+        final_state = emergency_graph.invoke(initial_state, config)
 
-        # Build response from final state
+        # Build response from final state with Phase 4 confidence scores
         assessment = Assessment(
             emergency_type=final_state.get('emergency_type', 'unknown'),
             severity=final_state.get('severity', 3),
             immediate_risks=final_state.get('immediate_risks', []),
-            recommended_response=final_state.get('recommended_response', 'contact_help')
+            recommended_response=final_state.get('recommended_response', 'contact_help'),
+            confidence=final_state.get('situation_confidence')  # Phase 4
         )
 
         guidance = Guidance(
             steps=final_state.get('guidance_steps', []),
-            provided_by=AgentNames.GUIDANCE
+            provided_by=AgentNames.GUIDANCE,
+            confidence=final_state.get('guidance_confidence')  # Phase 4
         )
 
         resources = Resource(
             nearby_hospitals=final_state.get('nearby_hospitals'),
             emergency_services=final_state.get('emergency_services', '911'),
-            provided_by=AgentNames.RESOURCE
+            provided_by=AgentNames.RESOURCE,
+            confidence=final_state.get('resource_confidence')  # Phase 4
         )
 
         execution_time = time.time() - start_time
@@ -195,23 +219,47 @@ async def assess_emergency_multi_agent(request: EmergencyRequest):
             agents_called=final_state.get('agents_called', []),
             total_time=execution_time,
             model=Config.MODEL_NAME,
-            provider="OpenRouter"
+            provider="OpenRouter",
+            total_tokens=final_state.get('total_tokens', 0),  # Phase 4
+            workflow_id=workflow_id  # Phase 4
+        )
+
+        # Phase 4: Extract execution metrics
+        execution_trace = final_state.get('execution_trace', [])
+        agent_timings = {}
+        routing_decisions = []
+
+        for trace in execution_trace:
+            agent = trace.get('agent', 'unknown')
+            exec_time = trace.get('execution_time', 0)
+            action = trace.get('action', '')
+
+            if exec_time > 0:
+                agent_timings[agent] = agent_timings.get(agent, 0) + exec_time
+
+            if action == 'routing_decision':
+                routing_decisions.append(f"{agent} → {trace.get('next_agent')}: {trace.get('reason', '')}")
+
+        metrics = ExecutionMetrics(
+            execution_trace=execution_trace,
+            agent_timings=agent_timings,
+            routing_decisions=routing_decisions
         )
 
         response = MultiAgentResponse(
             assessment=assessment,
             guidance=guidance,
             resources=resources,
-            orchestration=orchestration
+            orchestration=orchestration,
+            metrics=metrics  # Phase 4
         )
 
-        print(f"\n{'='*60}")
-        print(f"✅ MULTI-AGENT ASSESSMENT COMPLETE")
-        print(f"{'='*60}")
-        print(f"⏱️  Total execution time: {execution_time:.2f}s")
-        print(f"🤖 Agents called: {', '.join(final_state.get('agents_called', []))}")
-        print(f"📊 Total tokens used: {final_state.get('total_tokens', 0)}")
-        print(f"{'='*60}\n")
+        # Phase 4: Structured logging for completion
+        log_workflow_completed(
+            workflow_id,
+            execution_time,
+            final_state.get('agents_called', [])
+        )
 
         return response
 
@@ -231,20 +279,32 @@ async def root():
     """Root endpoint with API information."""
     return {
         "message": "SOS Multi-Agent Emergency Assessment System",
-        "version": "2.0.0",
+        "version": "3.0.0",
         "endpoints": {
             "health": "/health (GET)",
             "assess": "/assess (POST) - Single agent",
-            "assess_multi": "/assess-multi (POST) - Multi-agent orchestration",
+            "assess_multi": "/assess-multi (POST) - Multi-agent orchestration with Phase 4 enhancements",
             "docs": "/docs"
         },
-        "phase": "Phase 2: Multi-Agent with LangGraph ✅",
+        "phase": "Phase 4: Enhanced Features ✅",
         "features": [
             "Single-agent emergency assessment",
             "Multi-agent orchestration with LangGraph",
-            "Supervisor routing pattern",
-            "Specialized agents: Situation, Guidance, Resource"
-        ]
+            "Supervisor routing pattern with dynamic routing",
+            "Specialized agents: Situation, Guidance, Resource",
+            "Agent confidence scores (1-5)",
+            "Conversation history with checkpointing",
+            "Detailed execution traces and metrics",
+            "Structured logging and monitoring",
+            "Performance tracking and optimization"
+        ],
+        "phase_4_enhancements": {
+            "state_management": "LangGraph MemorySaver checkpointing",
+            "conversation_history": "Thread-based session continuity",
+            "agent_handoffs": "Dynamic routing based on emergency type and severity",
+            "enhanced_responses": "Confidence scores and agent metadata",
+            "monitoring": "Structured logging, execution traces, performance metrics"
+        }
     }
 
 
