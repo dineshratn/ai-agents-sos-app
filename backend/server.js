@@ -1,188 +1,202 @@
 require('dotenv').config({ path: '../.env' });
 const express = require('express');
+const http = require('http');
 const cors = require('cors');
 const axios = require('axios');
 
+// Supabase configuration
+const { testConnection } = require('./src/config/supabase');
+
+// WebSocket server
+const { initializeWebSocketServer, cleanupWebSocketServer } = require('./src/websocket/server');
+
+// Import routes
+const authRoutes = require('./src/routes/auth');
+const emergencyRoutes = require('./src/routes/emergency');
+const contactsRoutes = require('./src/routes/contacts');
+const messagesRoutes = require('./src/routes/messages');
+const userRoutes = require('./src/routes/user');
+
 const app = express();
+const httpServer = http.createServer(app);
 const PORT = process.env.PORT || 3000;
 const PYTHON_SERVICE_URL = process.env.PYTHON_SERVICE_URL || 'http://localhost:8000';
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  credentials: true
+}));
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Serve static frontend files
 app.use(express.static('../frontend'));
 
 // Health check endpoint
 app.get('/api/health', async (req, res) => {
   try {
     // Check Python service health
-    const pythonHealth = await axios.get(`${PYTHON_SERVICE_URL}/health`);
-
-    res.json({
-      status: 'ok',
-      message: 'SOS App Backend is running',
-      pythonService: {
+    let pythonStatus = { status: 'disconnected' };
+    try {
+      const pythonHealth = await axios.get(`${PYTHON_SERVICE_URL}/health`, { timeout: 3000 });
+      pythonStatus = {
         status: 'connected',
         version: pythonHealth.data.version,
         model: pythonHealth.data.model
-      }
-    });
-  } catch (error) {
+      };
+    } catch (err) {
+      pythonStatus = {
+        status: 'disconnected',
+        error: 'Multi-agent service unavailable'
+      };
+    }
+
     res.json({
       status: 'ok',
       message: 'SOS App Backend is running',
-      pythonService: {
-        status: 'disconnected',
-        error: 'Multi-agent service unavailable'
-      }
-    });
-  }
-});
-
-// Emergency trigger endpoint with AI assessment
-app.post('/api/emergency/trigger', async (req, res) => {
-  try {
-    const { description, location } = req.body;
-
-    if (!description) {
-      return res.status(400).json({
-        error: 'Description is required',
-        message: 'Please provide a description of the emergency'
-      });
-    }
-
-    console.log('🚨 Emergency triggered:', { description, location });
-    console.log('📡 Calling Python multi-agent service...');
-
-    // Call Python multi-agent service
-    const assessment = await assessWithMultiAgent(description, location);
-
-    // Create emergency session
-    const emergency = {
-      id: generateId(),
-      description,
-      location: location || 'Unknown',
-      triggeredAt: new Date().toISOString(),
-      assessment,
-      status: 'active'
-    };
-
-    console.log('✅ Multi-agent assessment completed');
-    console.log(`🤖 Agents called: ${assessment.agentsCalled?.join(', ')}`);
-    console.log(`⏱️  Total time: ${assessment.executionTime}s`);
-
-    res.json({
-      success: true,
-      emergency,
-      message: 'Emergency alert created with multi-agent assessment'
-    });
-
-  } catch (error) {
-    console.error('Error processing emergency:', error);
-
-    // Fallback response if OpenAI fails
-    const fallbackAssessment = getFallbackAssessment();
-
-    res.status(200).json({
-      success: true,
-      emergency: {
-        id: generateId(),
-        description: req.body.description,
-        location: req.body.location || 'Unknown',
-        triggeredAt: new Date().toISOString(),
-        assessment: fallbackAssessment,
-        status: 'active'
+      version: '4.0.0',
+      services: {
+        supabase: 'connected',
+        websocket: 'connected',
+        python: pythonStatus.status,
+        redis: 'not_implemented'
       },
-      warning: 'AI assessment unavailable, using fallback guidance',
-      message: 'Emergency alert created with fallback guidance'
+      pythonService: pythonStatus
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      message: 'Health check failed',
+      error: error.message
     });
   }
 });
 
-// Multi-Agent Assessment Function - Calls Python service
-async function assessWithMultiAgent(description, location) {
-  try {
-    const startTime = Date.now();
+// API Routes
+app.use('/api/auth', authRoutes);
+app.use('/api/emergency', emergencyRoutes);
+app.use('/api/contacts', contactsRoutes);
+app.use('/api/messages', messagesRoutes);
+app.use('/api/user', userRoutes);
 
-    // Call Python multi-agent service
-    const response = await axios.post(`${PYTHON_SERVICE_URL}/assess-multi`, {
-      description,
-      location
-    }, {
-      timeout: 60000 // 60 second timeout for multi-agent processing
-    });
+// Catch-all for API routes (404)
+app.use('/api/*', (req, res) => {
+  res.status(404).json({
+    error: 'Not found',
+    message: 'The requested API endpoint does not exist',
+    path: req.originalUrl
+  });
+});
 
-    const data = response.data;
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error('Unhandled error:', err);
+  res.status(500).json({
+    error: 'Internal server error',
+    message: process.env.NODE_ENV === 'development' ? err.message : 'An unexpected error occurred'
+  });
+});
 
-    // Transform multi-agent response to match frontend expectations
-    return {
-      // From Situation Agent
-      emergencyType: data.assessment.emergency_type,
-      severityLevel: data.assessment.severity,
-      immediateRisks: data.assessment.immediate_risks,
-      recommendedResponse: data.assessment.recommended_response,
-
-      // From Guidance Agent
-      guidance: data.guidance.steps,
-
-      // From Resource Agent
-      nearbyHospitals: data.resources.nearby_hospitals,
-      emergencyServices: data.resources.emergency_services,
-
-      // Meta information
-      aiModel: data.orchestration.model,
-      aiProvider: data.orchestration.provider,
-      tokensUsed: 0, // Not tracking in current implementation
-      generatedAt: new Date().toISOString(),
-
-      // Multi-agent specific
-      agentsCalled: data.orchestration.agents_called,
-      executionTime: ((Date.now() - startTime) / 1000).toFixed(2),
-      multiAgent: true
-    };
-
-  } catch (error) {
-    console.error('❌ Python service error:', error.message);
-    throw error;
-  }
-}
-
-// Fallback assessment when AI is unavailable
-function getFallbackAssessment() {
-  return {
-    emergencyType: 'unknown',
-    severityLevel: 3,
-    immediateRisks: ['Unable to assess with AI - proceed with caution'],
-    recommendedResponse: 'Contact emergency services if situation is urgent',
-    guidance: [
-      'Stay calm and assess the situation',
-      'Move to a safe location if possible',
-      'Call 911 if life-threatening',
-      'Contact your emergency contacts',
-      'Follow any specific safety protocols for your situation'
-    ],
-    aiModel: 'fallback',
-    generatedAt: new Date().toISOString()
-  };
-}
-
-// Simple ID generator
-function generateId() {
-  return `sos_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-}
+// Initialize WebSocket server
+let io;
 
 // Start server
-app.listen(PORT, async () => {
-  console.log(`🚨 SOS App Backend (Node.js Gateway) running on http://localhost:${PORT}`);
-  console.log(`📊 Health check: http://localhost:${PORT}/api/health`);
-  console.log(`🐍 Python Service URL: ${PYTHON_SERVICE_URL}`);
-  console.log(`🤖 Multi-Agent System: Supervisor + 3 Specialists`);
-
-  // Check Python service connection
+async function startServer() {
   try {
-    const health = await axios.get(`${PYTHON_SERVICE_URL}/health`, { timeout: 5000 });
-    console.log(`✅ Python service connected: ${health.data.service} v${health.data.version}`);
+    // Test Supabase connection
+    console.log('🔗 Testing Supabase connection...');
+    await testConnection();
+
+    // Initialize WebSocket server
+    io = initializeWebSocketServer(httpServer);
+
+    // Start HTTP + WebSocket server
+    httpServer.listen(PORT, async () => {
+      console.log('\n' + '='.repeat(60));
+      console.log('🚨 SOS App Backend - v4.0.0 (Supabase + WebSocket Edition)');
+      console.log('='.repeat(60));
+      console.log(`📡 HTTP Server: http://localhost:${PORT}`);
+      console.log(`🔌 WebSocket Server: ws://localhost:${PORT}`);
+      console.log(`📊 Health check: http://localhost:${PORT}/api/health`);
+      console.log('');
+      console.log('📌 REST API Endpoints:');
+      console.log('   Auth:      POST   /api/auth/signup');
+      console.log('              POST   /api/auth/login');
+      console.log('              POST   /api/auth/logout');
+      console.log('              GET    /api/auth/me');
+      console.log('');
+      console.log('   Emergency: POST   /api/emergency/trigger');
+      console.log('              GET    /api/emergency');
+      console.log('              GET    /api/emergency/:id');
+      console.log('              PATCH  /api/emergency/:id/resolve');
+      console.log('              PATCH  /api/emergency/:id/cancel');
+      console.log('');
+      console.log('   Contacts:  GET    /api/contacts');
+      console.log('              POST   /api/contacts');
+      console.log('              GET    /api/contacts/:id');
+      console.log('              PUT    /api/contacts/:id');
+      console.log('              DELETE /api/contacts/:id');
+      console.log('');
+      console.log('   Messages:  GET    /api/messages/emergency/:emergencyId');
+      console.log('              POST   /api/messages/emergency/:emergencyId');
+      console.log('              GET    /api/messages/:id');
+      console.log('              DELETE /api/messages/:id');
+      console.log('');
+      console.log('   User:      GET    /api/user/profile');
+      console.log('              PUT    /api/user/profile');
+      console.log('              GET    /api/user/stats');
+      console.log('');
+      console.log('🔐 Security: Row Level Security (RLS) enabled on all tables');
+      console.log('🔄 Realtime: Supabase subscriptions + Socket.IO active');
+      console.log('');
+
+      // Check Python service connection
+      console.log('🐍 Python AI Service:');
+      try {
+        const health = await axios.get(`${PYTHON_SERVICE_URL}/health`, { timeout: 5000 });
+        console.log(`   ✅ Connected: ${health.data.service} v${health.data.version}`);
+        console.log(`   🤖 Model: ${health.data.model}`);
+        console.log(`   🔀 Multi-Agent: Supervisor + 3 Specialists`);
+      } catch (error) {
+        console.log(`   ⚠️  Not available - start it with:`);
+        console.log(`   docker run -d --name sos-agents -p 8000:8000 --env-file .env -e VERIFY_SSL=false sos-agents:latest`);
+      }
+
+      console.log('');
+      console.log('='.repeat(60));
+      console.log('✅ Backend ready to receive requests');
+      console.log('='.repeat(60) + '\n');
+    });
   } catch (error) {
-    console.log(`⚠️  Python service not available - start it with: docker run -d --name sos-agents -p 8000:8000 --env-file .env -e VERIFY_SSL=false sos-agents:latest`);
+    console.error('\n❌ Failed to start server:', error.message);
+    console.error('Please check your Supabase configuration in .env file');
+    process.exit(1);
   }
-});
+}
+
+// Handle graceful shutdown
+async function shutdown() {
+  console.log('\n📛 Shutdown signal received...');
+
+  if (io) {
+    await cleanupWebSocketServer(io);
+  }
+
+  httpServer.close(() => {
+    console.log('✅ HTTP server closed');
+    process.exit(0);
+  });
+
+  // Force close after 10 seconds
+  setTimeout(() => {
+    console.error('⚠️  Forced shutdown after timeout');
+    process.exit(1);
+  }, 10000);
+}
+
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);
+
+// Start the server
+startServer();
