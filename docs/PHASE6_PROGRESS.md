@@ -1,11 +1,26 @@
 # Phase 6: Web Enhancement - Progress Report
 
+## 🚀 Major Update: Supabase Integration (Nov 29, 2025)
+
+**Architecture Change**: Migrated from self-hosted PostgreSQL to **Supabase** (managed PostgreSQL + Auth + Realtime)
+
+**Benefits**:
+- ✅ No need to manage PostgreSQL server
+- ✅ Built-in authentication (no custom JWT code)
+- ✅ Realtime subscriptions out of the box
+- ✅ Row Level Security (RLS) for automatic data isolation
+- ✅ Free tier with 500MB database + unlimited API requests
+
+See [`docs/SUPABASE_INTEGRATION.md`](./SUPABASE_INTEGRATION.md) for complete setup guide.
+
+---
+
 ## Overview
 
 Phase 6 enhances the v3.0.0 POC into a production web application with database persistence, real-time WebSocket updates, and multi-user support.
 
-**Status**: Foundation Complete (30% of Phase 6)
-**Next Steps**: Backend implementation, WebSocket server, Authentication
+**Status**: Database Migration Complete (40% of Phase 6)
+**Next Steps**: Backend implementation, WebSocket integration, Frontend enhancement
 
 ---
 
@@ -26,49 +41,68 @@ Phase 6 enhances the v3.0.0 POC into a production web application with database 
 - Risk analysis and mitigation strategies
 - Success criteria and technical metrics
 
-### 2. Database Schema
+### 2. Database Schema (UPDATED: Supabase)
 
-**File**: `database/init.sql` (200+ lines)
+**Files**:
+- ~~`database/init.sql`~~ (deprecated - replaced by Supabase)
+- ✅ `database/supabase/migrations/20251129_initial_schema.sql` (450+ lines)
+- ✅ `database/supabase/README.md` (setup guide)
 
-**Tables Created**:
-- ✅ `users` - User accounts with authentication
+**Tables Created** (8 tables in Supabase):
 - ✅ `emergency_contacts` - Emergency contact management
 - ✅ `emergencies` - Emergency session tracking
-- ✅ `locations` - Location tracking with PostGIS
+- ✅ `locations` - Location tracking with PostGIS geography
 - ✅ `ai_assessments` - AI agent assessment storage
 - ✅ `messages` - Two-way communication
 - ✅ `notifications` - Notification delivery tracking
 - ✅ `audit_log` - System audit trail
+- ✅ `user_profiles` - Extended user data (auth handled by Supabase)
 
 **PostGIS Features**:
-- Geometry column for location data
-- Automatic geom update trigger
+- Geography column for location data (ST_Point with SRID 4326)
+- Automatic geography creation from lat/lng via trigger
 - Spatial indexing (GIST)
-- Support for geographic queries
+- Distance calculations (ST_Distance, ST_DWithin)
+
+**Row Level Security (RLS)**:
+- All tables protected with RLS policies
+- Automatic data isolation per user (auth.uid())
+- Cannot be bypassed from client (database-level security)
+
+**Realtime Subscriptions**:
+- Enabled for: emergencies, locations, messages, notifications
+- WebSocket-based live updates
+- Integrated with Supabase Realtime
 
 **Triggers**:
 - `updated_at` auto-update on row changes
-- `location_geom` auto-population from lat/lng
+- `location_geography` auto-population from lat/lng
+- `create_user_profile()` auto-create profile on signup
 
-### 3. Docker Compose Configuration
+### 3. Docker Compose Configuration (UPDATED: Supabase)
 
 **File**: `docker-compose.yml`
 
 **Services**:
-- ✅ PostgreSQL 15 + PostGIS 3.3
+- ~~PostgreSQL 15 + PostGIS~~ (replaced by Supabase cloud)
 - ✅ Redis 7 (session storage, caching)
 - ✅ Python AI Service (existing, integrated)
-- ✅ Node.js Backend (placeholder, to be implemented)
+- ✅ Node.js Backend (to be implemented with Supabase client)
+
+**Database**: Now using **Supabase** (cloud-hosted PostgreSQL + PostGIS)
+- No need to manage PostgreSQL container
+- Database URL provided by Supabase
+- Free tier: 500MB database, unlimited API requests
 
 **Features**:
 - Service health checks
 - Automatic restarts
 - Resource limits
-- Persistent volumes
+- Persistent volumes (Redis only)
 - Isolated network
 - Service dependencies
 
-### 4. Environment Configuration
+### 4. Environment Configuration (UPDATED: Supabase)
 
 **Files**:
 - ✅ `.env` - Development configuration
@@ -76,30 +110,45 @@ Phase 6 enhances the v3.0.0 POC into a production web application with database 
 
 **New Variables**:
 ```env
-POSTGRES_PASSWORD=***
-DATABASE_URL=postgresql://sos_user:***@localhost:5432/sos_emergency
+# Supabase (Database + Auth + Realtime)
+SUPABASE_URL=https://xxxxx.supabase.co
+SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+# Other services
 REDIS_URL=redis://localhost:6379
-JWT_SECRET=***
 SESSION_SECRET=***
 FRONTEND_URL=http://localhost:3000
 PYTHON_SERVICE_URL=http://localhost:8000
 ```
 
-### 5. Backend Package Updates
+**Removed** (no longer needed with Supabase):
+- ~~POSTGRES_PASSWORD~~ (Supabase handles)
+- ~~DATABASE_URL~~ (replaced by SUPABASE_URL)
+- ~~JWT_SECRET~~ (Supabase handles JWT)
+
+### 5. Backend Package Updates (UPDATED: Supabase)
 
 **File**: `backend/package.json`
 
 **New Dependencies**:
-- `pg` ^8.11.3 - PostgreSQL client
-- `sequelize` ^6.35.1 - ORM for database
-- `bcrypt` ^5.1.1 - Password hashing
-- `jsonwebtoken` ^9.0.2 - JWT authentication
-- `socket.io` ^4.6.0 - WebSocket server
-- `redis` ^4.6.11 - Redis client
-- `express-session` ^1.17.3 - Session management
-- `uuid` ^9.0.1 - UUID generation
+- ✅ `@supabase/supabase-js` ^2.38.4 - Supabase client (all-in-one)
+- ✅ `socket.io` ^4.6.0 - WebSocket server
+- ✅ `redis` ^4.6.11 - Redis client
+- ✅ `express-session` ^1.17.3 - Session management
+- ✅ `uuid` ^9.0.1 - UUID generation
+
+**Removed** (replaced by Supabase):
+- ~~`pg`~~ (PostgreSQL client - Supabase handles)
+- ~~`sequelize`~~ (ORM - Supabase has built-in query builder)
+- ~~`bcrypt`~~ (Password hashing - Supabase Auth handles)
+- ~~`jsonwebtoken`~~ (JWT - Supabase Auth handles)
+- ~~`pg-hstore`~~ (PostgreSQL types - not needed)
 
 **Version**: Upgraded to 4.0.0
+
+**Files Created**:
+- ✅ `backend/src/config/supabase.js` - Supabase client configuration
 
 ---
 
@@ -238,20 +287,26 @@ Python AI Service (FastAPI + LangGraph)
 OpenRouter API
 ```
 
-### Target (v4.0.0 - After Phase 6)
+### Target (v4.0.0 - After Phase 6 with Supabase)
 
 ```
 Web Browser (Enhanced UI + Socket.IO client)
     ↓ HTTP + WebSocket
 Node.js Backend (Express + Socket.IO)
-    ├── Authentication (JWT)
-    ├── Database (Sequelize + PostgreSQL)
+    ├── Supabase Client (@supabase/supabase-js)
+    │   ├── Auth (built-in JWT)
+    │   ├── Database (PostgreSQL queries)
+    │   └── Realtime (WebSocket subscriptions)
     ├── Session (Redis)
-    ├── WebSocket (Socket.IO)
+    ├── WebSocket (Socket.IO for custom events)
     └── API Proxy → Python AI Service
-        ↓ HTTP
-PostgreSQL + PostGIS
-Redis
+        ↓ HTTPS
+Supabase (Cloud)
+    ├── PostgreSQL 15 + PostGIS
+    ├── Authentication (JWT)
+    ├── Row Level Security (RLS)
+    └── Realtime (WebSocket)
+Redis (Local)
 Python AI Service (FastAPI + LangGraph)
     ↓
 OpenRouter API
@@ -261,7 +316,23 @@ OpenRouter API
 
 ## Quick Start (Current State)
 
-### 1. Start Services
+### 1. Setup Supabase
+
+**First time setup** (one-time):
+
+1. Create Supabase project at https://app.supabase.com
+2. Run migration: Copy `database/supabase/migrations/20251129_initial_schema.sql` into Supabase SQL Editor
+3. Get credentials: Project Settings → API
+4. Update `.env` with your Supabase credentials:
+   ```env
+   SUPABASE_URL=https://xxxxx.supabase.co
+   SUPABASE_ANON_KEY=eyJhbGci...
+   SUPABASE_SERVICE_ROLE_KEY=eyJhbGci...
+   ```
+
+See [`database/supabase/README.md`](../database/supabase/README.md) for detailed setup guide.
+
+### 2. Start Services
 
 ```bash
 cd /home/dinesh/docker-ai-agents-training/week1-basics
@@ -276,24 +347,21 @@ docker-compose ps
 docker-compose logs -f
 ```
 
-### 2. Verify Database
+### 3. Verify Supabase Connection
 
+**From Supabase Dashboard**:
+1. Go to Table Editor (left sidebar)
+2. Verify 8 tables exist: emergencies, locations, ai_assessments, etc.
+3. Go to Database → Replication to see Realtime enabled tables
+
+**From Backend** (once implemented):
 ```bash
-# Connect to PostgreSQL
-docker exec -it sos-postgres psql -U sos_user -d sos_emergency
-
-# List tables
-\dt
-
-# Check schema
-\d emergencies
-\d locations
-
-# Exit
-\q
+# Test Supabase connection
+curl http://localhost:3000/health
+# Should return: { "supabase": "connected", "redis": "connected" }
 ```
 
-### 3. Verify Redis
+### 4. Verify Redis
 
 ```bash
 # Connect to Redis
@@ -307,7 +375,7 @@ PING
 exit
 ```
 
-### 4. Test Python AI Service
+### 5. Test Python AI Service
 
 ```bash
 # Health check
@@ -323,24 +391,25 @@ curl -X POST http://localhost:8000/assess-multi \
 
 ## Implementation Timeline
 
-### Completed (Days 1-2)
+### Completed (Days 1-3)
 
 - ✅ Day 1: Database schema and Docker Compose
 - ✅ Day 2: Environment configuration and package updates
+- ✅ Day 3: **Supabase migration** (schema with RLS, auth config, documentation)
 
-### Remaining (Days 3-7)
+### Remaining (Days 4-7)
 
-- ⏳ Day 3: Database models and authentication
-- ⏳ Day 4: WebSocket server and REST API
-- ⏳ Day 5: Enhanced frontend with real-time updates
-- ⏳ Day 6: Integration testing and bug fixes
-- ⏳ Day 7: Documentation and deployment
+- ⏳ Day 4: Backend implementation (Supabase integration, REST API)
+- ⏳ Day 5: WebSocket server with Supabase Realtime
+- ⏳ Day 6: Enhanced frontend with auth + real-time updates
+- ⏳ Day 7: Integration testing and deployment
 
-**Progress**: 30% complete (2 of 7 days)
+**Progress**: 40% complete (3 of 7 days)
+**Latest**: Migrated to Supabase (Nov 29, 2025)
 
 ---
 
-## Next Immediate Steps
+## Next Immediate Steps (Updated for Supabase)
 
 ### 1. Install Backend Dependencies
 
@@ -349,56 +418,85 @@ cd backend
 npm install
 ```
 
-This will install all the new packages:
-- PostgreSQL client (pg)
-- Sequelize ORM
-- Socket.IO
-- Redis client
-- JWT and bcrypt
-- etc.
+This will install:
+- ✅ Supabase client (@supabase/supabase-js)
+- ✅ Socket.IO
+- ✅ Redis client
+- ✅ Express session
+- ✅ UUID
 
 ### 2. Create Backend File Structure
 
 ```bash
-mkdir -p src/{config,models,services,middleware,routes,websocket}
+mkdir -p src/{config,services,middleware,routes,websocket}
 mkdir -p src/websocket/{events,middleware}
 ```
 
-### 3. Implement Database Connection
+### 3. Test Supabase Connection
 
-Create `backend/src/config/database.js`:
-- Sequelize configuration
-- Connection pool settings
-- Database authentication
+**Already created**: `backend/src/config/supabase.js`
+- ✅ Supabase client initialized
+- ✅ Admin client for bypassing RLS
+- ✅ Helper functions (getUserFromToken, createAuthenticatedClient)
 
-### 4. Create Sequelize Models
+**Test it**:
+```bash
+node -e "require('./src/config/supabase').testConnection()"
+```
 
-Implement models for all 7 tables:
-- User, Emergency, Location, AIAssessment, etc.
-- Define relationships (foreign keys)
-- Add validation rules
+### 4. Implement Authentication Routes
 
-### 5. Implement Authentication
+Create `backend/src/routes/auth.js`:
+- User signup (Supabase Auth)
+- User login (Supabase Auth)
+- Logout
+- Get current user
 
-Create `backend/src/services/auth.js`:
-- User registration (bcrypt password hashing)
-- User login (JWT token generation)
-- Token verification
+**No need for**:
+- ~~Password hashing (Supabase handles)~~
+- ~~JWT generation (Supabase handles)~~
+- ~~Token verification (Supabase handles)~~
 
-### 6. Create Auth Middleware
+### 5. Create Auth Middleware
 
 Create `backend/src/middleware/auth.js`:
-- JWT verification middleware
-- Protect routes requiring authentication
-- Extract user from token
+- Extract JWT from Authorization header
+- Verify with Supabase (`getUserFromToken`)
+- Attach user to req.user
 
-### 7. Update Main Server
+### 6. Implement REST API Routes
+
+Create routes:
+- `src/routes/emergency.js` - Emergency operations
+- `src/routes/contacts.js` - Emergency contacts
+- `src/routes/messages.js` - Messaging
+- `src/routes/user.js` - User profile
+
+### 7. Implement WebSocket Server
+
+Create `src/websocket/server.js`:
+- Socket.IO setup
+- Auth middleware for sockets
+- Emergency events (trigger, resolve, update)
+- Location events (tracking)
+- Message events (send, receive)
+
+### 8. Integrate Supabase Realtime
+
+Subscribe to database changes:
+- Listen to emergencies INSERT/UPDATE
+- Listen to locations INSERT
+- Listen to messages INSERT
+- Broadcast to Socket.IO rooms
+
+### 9. Update Main Server
 
 Update `backend/server.js`:
+- Import Supabase client
 - Import all routes
 - Set up WebSocket server
-- Connect to database
 - Connect to Redis
+- Test Supabase connection on startup
 - Start Express server
 
 ---
@@ -510,7 +608,16 @@ docker run -d --name sos-agents -p 8000:8000 --env-file .env sos-agents:latest
 
 ---
 
-**Last Updated**: 2025-11-29
+**Last Updated**: 2025-11-29 (Supabase Migration)
 **Phase**: 6 (Web Enhancement)
-**Progress**: 30% (Foundation Complete)
-**Next**: Backend implementation (database models, WebSocket, auth)
+**Progress**: 40% (Database Migration Complete)
+**Architecture**: Supabase (managed PostgreSQL + Auth + Realtime)
+**Next**: Backend implementation (REST API, WebSocket, Supabase integration)
+
+---
+
+## 📚 Additional Documentation
+
+- [`docs/SUPABASE_INTEGRATION.md`](./SUPABASE_INTEGRATION.md) - Complete Supabase integration guide
+- [`database/supabase/README.md`](../database/supabase/README.md) - Database setup instructions
+- [`database/supabase/migrations/20251129_initial_schema.sql`](../database/supabase/migrations/20251129_initial_schema.sql) - Database schema with RLS policies

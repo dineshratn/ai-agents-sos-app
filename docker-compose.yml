@@ -1,29 +1,8 @@
 version: '3.8'
 
 services:
-  # PostgreSQL with PostGIS for location data
-  postgres:
-    image: postgis/postgis:15-3.3-alpine
-    container_name: sos-postgres
-    environment:
-      POSTGRES_DB: sos_emergency
-      POSTGRES_USER: sos_user
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U sos_user -d sos_emergency"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - sos-network
-    restart: unless-stopped
-
   # Redis for session management and caching
+  # Note: Database is now handled by Supabase (cloud-hosted PostgreSQL + PostGIS)
   redis:
     image: redis:7-alpine
     container_name: sos-redis
@@ -60,8 +39,6 @@ services:
       - PORT=8000
       - VERIFY_SSL=${VERIFY_SSL:-false}
     depends_on:
-      postgres:
-        condition: service_healthy
       redis:
         condition: service_healthy
     healthcheck:
@@ -93,10 +70,11 @@ services:
     environment:
       - NODE_ENV=${NODE_ENV:-development}
       - PORT=3000
-      - DATABASE_URL=postgresql://sos_user:${POSTGRES_PASSWORD:-changeme}@postgres:5432/sos_emergency
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
       - REDIS_URL=redis://redis:6379
       - PYTHON_SERVICE_URL=http://python-ai:8000
-      - JWT_SECRET=${JWT_SECRET:-your-secret-key-change-in-production}
       - FRONTEND_URL=${FRONTEND_URL:-http://localhost:3000}
       - SESSION_SECRET=${SESSION_SECRET:-your-session-secret-change-in-production}
     volumes:
@@ -104,8 +82,6 @@ services:
       - /app/node_modules
       - ./frontend:/app/public
     depends_on:
-      postgres:
-        condition: service_healthy
       redis:
         condition: service_healthy
       python-ai:
@@ -124,7 +100,5 @@ networks:
     driver: bridge
 
 volumes:
-  postgres_data:
-    driver: local
   redis_data:
     driver: local
