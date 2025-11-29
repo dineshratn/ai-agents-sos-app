@@ -1,0 +1,130 @@
+version: '3.8'
+
+services:
+  # PostgreSQL with PostGIS for location data
+  postgres:
+    image: postgis/postgis:15-3.3-alpine
+    container_name: sos-postgres
+    environment:
+      POSTGRES_DB: sos_emergency
+      POSTGRES_USER: sos_user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sos_user -d sos_emergency"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - sos-network
+    restart: unless-stopped
+
+  # Redis for session management and caching
+  redis:
+    image: redis:7-alpine
+    container_name: sos-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - sos-network
+    restart: unless-stopped
+
+  # Python AI Multi-Agent Service (FastAPI + LangGraph)
+  python-ai:
+    build:
+      context: ./agents
+      dockerfile: Dockerfile
+    container_name: sos-agents
+    ports:
+      - "8000:8000"
+    environment:
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - SITE_URL=${SITE_URL:-http://localhost:3000}
+      - SITE_NAME=${SITE_NAME:-SOS Multi-Agent System}
+      - MODEL_NAME=${MODEL_NAME:-deepseek/deepseek-chat}
+      - TEMPERATURE=${TEMPERATURE:-0.3}
+      - MAX_TOKENS=${MAX_TOKENS:-1000}
+      - HOST=0.0.0.0
+      - PORT=8000
+      - VERIFY_SSL=${VERIFY_SSL:-false}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - sos-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
+
+  # Node.js Backend (Express + Socket.IO)
+  node-backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: sos-backend
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=${NODE_ENV:-development}
+      - PORT=3000
+      - DATABASE_URL=postgresql://sos_user:${POSTGRES_PASSWORD:-changeme}@postgres:5432/sos_emergency
+      - REDIS_URL=redis://redis:6379
+      - PYTHON_SERVICE_URL=http://python-ai:8000
+      - JWT_SECRET=${JWT_SECRET:-your-secret-key-change-in-production}
+      - FRONTEND_URL=${FRONTEND_URL:-http://localhost:3000}
+      - SESSION_SECRET=${SESSION_SECRET:-your-session-secret-change-in-production}
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+      - ./frontend:/app/public
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      python-ai:
+        condition: service_healthy
+    networks:
+      - sos-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+
+networks:
+  sos-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
