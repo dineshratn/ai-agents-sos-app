@@ -44,6 +44,11 @@ router.post('/signup', async (req, res) => {
     }
 
     // Create user with Supabase Auth
+    console.log('\n=== DEBUG: Starting signup process ===');
+    console.log('Email:', email);
+    console.log('Full Name:', full_name);
+    console.log('Phone:', phone);
+
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -55,11 +60,31 @@ router.post('/signup', async (req, res) => {
       }
     });
 
+    console.log('=== DEBUG: Supabase Auth Response ===');
+    console.log('Error:', error ? JSON.stringify(error, null, 2) : 'None');
+    console.log('Data:', data ? JSON.stringify({
+      user: data.user ? { id: data.user.id, email: data.user.email } : null,
+      session: data.session ? 'Present' : 'Null'
+    }, null, 2) : 'None');
+
     if (error) {
-      console.error('Signup error:', error);
+      console.error('\n=== FULL SIGNUP ERROR DETAILS ===');
+      console.error('Error name:', error.name);
+      console.error('Error message:', error.message);
+      console.error('Error status:', error.status);
+      console.error('Error code:', error.code);
+      console.error('Full error object:', JSON.stringify(error, null, 2));
+      console.error('Error stack:', error.stack);
+      console.error('===================================\n');
+
       return res.status(400).json({
         error: 'Signup failed',
-        message: error.message
+        message: error.message,
+        debug: {
+          code: error.code,
+          status: error.status,
+          details: error
+        }
       });
     }
 
