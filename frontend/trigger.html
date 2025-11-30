@@ -491,14 +491,35 @@
                     <div class="location-icon">❌</div>
                     <div class="location-text">
                         <strong>Geolocation not supported</strong>
-                        <small>Your browser doesn't support location services</small>
+                        <small>Your browser doesn't support location services. You can proceed without it.</small>
                     </div>
                 `;
+                nextBtn.disabled = false;
                 return;
             }
 
+            // Enable button after 5 seconds even if location is still loading
+            // This allows users to proceed if geolocation is slow or stuck
+            const autoEnableTimeout = setTimeout(() => {
+                if (nextBtn.disabled) {
+                    nextBtn.disabled = false;
+                    if (!location) {
+                        statusEl.className = 'location-status error';
+                        statusEl.innerHTML = `
+                            <div class="location-icon">⚠️</div>
+                            <div class="location-text">
+                                <strong>Location taking too long</strong>
+                                <small>You can proceed without location. Backend will use IP-based location.</small>
+                            </div>
+                        `;
+                    }
+                }
+            }, 5000);
+
             navigator.geolocation.getCurrentPosition(
                 (position) => {
+                    clearTimeout(autoEnableTimeout); // Clear the auto-enable timeout
+
                     location = {
                         latitude: position.coords.latitude,
                         longitude: position.coords.longitude,
@@ -517,28 +538,28 @@
                     nextBtn.disabled = false;
                 },
                 (error) => {
+                    clearTimeout(autoEnableTimeout); // Clear the auto-enable timeout
+
                     let errorMessage = 'Unable to get your location';
                     if (error.code === 1) {
-                        errorMessage = 'Location access denied. Please enable location permissions.';
+                        errorMessage = 'Location access denied. Click "Next" to continue without location.';
                     } else if (error.code === 2) {
-                        errorMessage = 'Location unavailable. Check your device settings.';
+                        errorMessage = 'Location unavailable. Click "Next" to continue without location.';
                     } else if (error.code === 3) {
-                        errorMessage = 'Location request timed out. Please try again.';
+                        errorMessage = 'Location request timed out. Click "Next" to continue without location.';
                     }
 
                     statusEl.className = 'location-status error';
                     statusEl.innerHTML = `
-                        <div class="location-icon">❌</div>
+                        <div class="location-icon">⚠️</div>
                         <div class="location-text">
                             <strong>Location Error</strong>
                             <small>${errorMessage}</small>
                         </div>
                     `;
 
-                    // Allow proceeding without location (will use IP-based location on backend)
-                    setTimeout(() => {
-                        nextBtn.disabled = false;
-                    }, 2000);
+                    // Allow proceeding without location immediately
+                    nextBtn.disabled = false;
                 }
             );
         }
@@ -560,10 +581,8 @@
         // Next step
         function nextStep() {
             if (currentStep === 1) {
-                if (!location) {
-                    showAlert('Please wait for location to be confirmed', 'error');
-                    return;
-                }
+                // Location is optional - can proceed without it
+                // Backend will use IP-based location if not provided
             } else if (currentStep === 2) {
                 const description = document.getElementById('description').value.trim();
                 if (!description) {
