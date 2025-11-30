@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trigger Emergency - SOS App</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 800px;
+            width: 100%;
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #f56565 0%, #c53030 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 32px;
+            margin-bottom: 8px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+
+        .back-btn {
+            position: absolute;
+            top: 30px;
+            left: 30px;
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        .back-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .form-container {
+            padding: 40px;
+        }
+
+        .step-indicator {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 30px;
+        }
+
+        .step {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: #e2e8f0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: #a0aec0;
+            transition: all 0.3s;
+        }
+
+        .step.active {
+            background: #667eea;
+            color: white;
+        }
+
+        .step.completed {
+            background: #48bb78;
+            color: white;
+        }
+
+        .form-step {
+            display: none;
+        }
+
+        .form-step.active {
+            display: block;
+            animation: fadeIn 0.3s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #2d3748;
+            font-size: 14px;
+        }
+
+        textarea {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 15px;
+            font-family: inherit;
+            resize: vertical;
+            min-height: 120px;
+            transition: all 0.3s;
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .location-status {
+            padding: 12px 16px;
+            border-radius: 8px;
+            border: 2px solid #e2e8f0;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .location-status.loading {
+            border-color: #fbd38d;
+            background: #fffaf0;
+        }
+
+        .location-status.success {
+            border-color: #9ae6b4;
+            background: #f0fff4;
+        }
+
+        .location-status.error {
+            border-color: #fc8181;
+            background: #fff5f5;
+        }
+
+        .location-icon {
+            font-size: 24px;
+        }
+
+        .location-text {
+            flex: 1;
+        }
+
+        .location-text strong {
+            display: block;
+            margin-bottom: 4px;
+            color: #2d3748;
+        }
+
+        .location-text small {
+            color: #718096;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 12px;
+            margin-top: 30px;
+        }
+
+        button {
+            flex: 1;
+            padding: 14px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #f56565 0%, #c53030 100%);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(245, 101, 101, 0.3);
+        }
+
+        .btn-secondary {
+            background: #e2e8f0;
+            color: #4a5568;
+        }
+
+        .btn-secondary:hover {
+            background: #cbd5e0;
+        }
+
+        button:disabled {
+            background: #a0aec0;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 0.6s linear infinite;
+            margin-right: 8px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* AI Assessment Display */
+        .assessment-result {
+            background: #f7fafc;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 20px;
+        }
+
+        .assessment-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #e2e8f0;
+        }
+
+        .assessment-header h3 {
+            color: #2d3748;
+            font-size: 18px;
+        }
+
+        .severity-indicator {
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .severity-1, .severity-2 {
+            background: #c6f6d5;
+            color: #22543d;
+        }
+
+        .severity-3 {
+            background: #feebc8;
+            color: #7c2d12;
+        }
+
+        .severity-4, .severity-5 {
+            background: #fed7d7;
+            color: #742a2a;
+        }
+
+        .assessment-field {
+            margin-bottom: 15px;
+        }
+
+        .assessment-field label {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #718096;
+            margin-bottom: 6px;
+        }
+
+        .assessment-field .value {
+            color: #2d3748;
+            font-size: 15px;
+            line-height: 1.6;
+        }
+
+        .alert {
+            padding: 16px 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .alert-error {
+            background: #fed7d7;
+            color: #742a2a;
+            border: 1px solid #fc8181;
+        }
+
+        .alert-success {
+            background: #c6f6d5;
+            color: #22543d;
+            border: 1px solid #9ae6b4;
+        }
+
+        .alert-info {
+            background: #bee3f8;
+            color: #2c5282;
+            border: 1px solid #90cdf4;
+        }
+
+        .success-message {
+            text-align: center;
+            padding: 40px 20px;
+        }
+
+        .success-message .icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+        }
+
+        .success-message h2 {
+            color: #2d3748;
+            margin-bottom: 12px;
+        }
+
+        .success-message p {
+            color: #718096;
+            margin-bottom: 30px;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                margin: 10px;
+            }
+
+            .form-container {
+                padding: 20px;
+            }
+
+            .btn-group {
+                flex-direction: column;
+            }
+
+            .back-btn {
+                position: static;
+                display: inline-block;
+                margin-bottom: 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header" style="position: relative;">
+            <a href="dashboard.html" class="back-btn">← Back</a>
+            <h1>🚨 Emergency Alert</h1>
+            <p>Help is on the way. Stay calm and provide details.</p>
+        </div>
+
+        <div class="form-container">
+            <!-- Step Indicator -->
+            <div class="step-indicator">
+                <div class="step active" id="step1">1</div>
+                <div class="step" id="step2">2</div>
+                <div class="step" id="step3">3</div>
+            </div>
+
+            <!-- Alert Container -->
+            <div id="alert-container"></div>
+
+            <!-- Step 1: Location -->
+            <div class="form-step active" id="form-step-1">
+                <h2 style="margin-bottom: 20px; color: #2d3748;">Step 1: Confirm Location</h2>
+
+                <div class="location-status loading" id="location-status">
+                    <div class="location-icon">📍</div>
+                    <div class="location-text">
+                        <strong>Getting your location...</strong>
+                        <small>Please allow location access when prompted</small>
+                    </div>
+                </div>
+
+                <div class="btn-group">
+                    <button class="btn-secondary" onclick="window.location.href='dashboard.html'">Cancel</button>
+                    <button class="btn-primary" id="btn-next-1" disabled>Next</button>
+                </div>
+            </div>
+
+            <!-- Step 2: Description -->
+            <div class="form-step" id="form-step-2">
+                <h2 style="margin-bottom: 20px; color: #2d3748;">Step 2: Describe the Emergency</h2>
+
+                <div class="form-group">
+                    <label>What's happening? *</label>
+                    <textarea
+                        id="description"
+                        placeholder="Describe the emergency situation in detail. Include symptoms, injuries, or immediate dangers..."
+                        required
+                    ></textarea>
+                    <small style="color: #718096;">Be as specific as possible to help AI assess the situation accurately.</small>
+                </div>
+
+                <div class="btn-group">
+                    <button class="btn-secondary" onclick="previousStep()">Back</button>
+                    <button class="btn-primary" onclick="nextStep()">Next</button>
+                </div>
+            </div>
+
+            <!-- Step 3: Review & Trigger -->
+            <div class="form-step" id="form-step-3">
+                <h2 style="margin-bottom: 20px; color: #2d3748;">Step 3: Review & Trigger</h2>
+
+                <div id="review-container">
+                    <!-- Will be populated with review info -->
+                </div>
+
+                <div id="assessment-container">
+                    <!-- Will be populated with AI assessment after triggering -->
+                </div>
+
+                <div class="btn-group" id="trigger-buttons">
+                    <button class="btn-secondary" onclick="previousStep()">Back</button>
+                    <button class="btn-danger" onclick="triggerEmergency()" id="btn-trigger">
+                        🚨 Trigger Emergency
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:3000/api';
+
+        let currentStep = 1;
+        let location = null;
+        let emergencyId = null;
+
+        // Check authentication
+        function checkAuth() {
+            const token = localStorage.getItem('access_token');
+            if (!token) {
+                window.location.href = 'login.html';
+                return null;
+            }
+            return token;
+        }
+
+        // Get user location
+        function getUserLocation() {
+            const statusEl = document.getElementById('location-status');
+            const nextBtn = document.getElementById('btn-next-1');
+
+            if (!navigator.geolocation) {
+                statusEl.className = 'location-status error';
+                statusEl.innerHTML = `
+                    <div class="location-icon">❌</div>
+                    <div class="location-text">
+                        <strong>Geolocation not supported</strong>
+                        <small>Your browser doesn't support location services</small>
+                    </div>
+                `;
+                return;
+            }
+
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    location = {
+                        latitude: position.coords.latitude,
+                        longitude: position.coords.longitude,
+                        accuracy: position.coords.accuracy
+                    };
+
+                    statusEl.className = 'location-status success';
+                    statusEl.innerHTML = `
+                        <div class="location-icon">✅</div>
+                        <div class="location-text">
+                            <strong>Location confirmed</strong>
+                            <small>Lat: ${location.latitude.toFixed(6)}, Lng: ${location.longitude.toFixed(6)} (±${Math.round(location.accuracy)}m)</small>
+                        </div>
+                    `;
+
+                    nextBtn.disabled = false;
+                },
+                (error) => {
+                    let errorMessage = 'Unable to get your location';
+                    if (error.code === 1) {
+                        errorMessage = 'Location access denied. Please enable location permissions.';
+                    } else if (error.code === 2) {
+                        errorMessage = 'Location unavailable. Check your device settings.';
+                    } else if (error.code === 3) {
+                        errorMessage = 'Location request timed out. Please try again.';
+                    }
+
+                    statusEl.className = 'location-status error';
+                    statusEl.innerHTML = `
+                        <div class="location-icon">❌</div>
+                        <div class="location-text">
+                            <strong>Location Error</strong>
+                            <small>${errorMessage}</small>
+                        </div>
+                    `;
+
+                    // Allow proceeding without location (will use IP-based location on backend)
+                    setTimeout(() => {
+                        nextBtn.disabled = false;
+                    }, 2000);
+                }
+            );
+        }
+
+        // Show alert
+        function showAlert(message, type = 'info') {
+            const container = document.getElementById('alert-container');
+            const alert = document.createElement('div');
+            alert.className = `alert alert-${type}`;
+            alert.textContent = message;
+
+            container.appendChild(alert);
+
+            setTimeout(() => {
+                alert.remove();
+            }, 5000);
+        }
+
+        // Next step
+        function nextStep() {
+            if (currentStep === 1) {
+                if (!location) {
+                    showAlert('Please wait for location to be confirmed', 'error');
+                    return;
+                }
+            } else if (currentStep === 2) {
+                const description = document.getElementById('description').value.trim();
+                if (!description) {
+                    showAlert('Please describe the emergency', 'error');
+                    return;
+                }
+
+                // Populate review
+                populateReview();
+            }
+
+            // Hide current step
+            document.getElementById(`form-step-${currentStep}`).classList.remove('active');
+            document.getElementById(`step${currentStep}`).classList.remove('active');
+            document.getElementById(`step${currentStep}`).classList.add('completed');
+
+            // Show next step
+            currentStep++;
+            document.getElementById(`form-step-${currentStep}`).classList.add('active');
+            document.getElementById(`step${currentStep}`).classList.add('active');
+        }
+
+        // Previous step
+        function previousStep() {
+            // Hide current step
+            document.getElementById(`form-step-${currentStep}`).classList.remove('active');
+            document.getElementById(`step${currentStep}`).classList.remove('active');
+
+            // Show previous step
+            currentStep--;
+            document.getElementById(`form-step-${currentStep}`).classList.add('active');
+            document.getElementById(`step${currentStep}`).classList.remove('completed');
+            document.getElementById(`step${currentStep}`).classList.add('active');
+        }
+
+        // Populate review
+        function populateReview() {
+            const description = document.getElementById('description').value.trim();
+            const reviewContainer = document.getElementById('review-container');
+
+            reviewContainer.innerHTML = `
+                <div class="assessment-result" style="background: white; border-color: #667eea;">
+                    <div class="assessment-field">
+                        <label>Emergency Description</label>
+                        <div class="value">${description}</div>
+                    </div>
+                    <div class="assessment-field">
+                        <label>Location</label>
+                        <div class="value">
+                            ${location
+                                ? `Lat: ${location.latitude.toFixed(6)}, Lng: ${location.longitude.toFixed(6)} (±${Math.round(location.accuracy)}m)`
+                                : 'Location not available (will use IP-based location)'
+                            }
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Trigger emergency
+        async function triggerEmergency() {
+            const token = localStorage.getItem('access_token');
+            const description = document.getElementById('description').value.trim();
+            const triggerBtn = document.getElementById('btn-trigger');
+
+            triggerBtn.disabled = true;
+            triggerBtn.innerHTML = '<span class="loading-spinner"></span>Triggering Emergency...';
+
+            try {
+                const payload = {
+                    description,
+                    location: location ? `${location.latitude},${location.longitude}` : 'Unknown'
+                };
+
+                const response = await fetch(`${API_URL}/emergency/trigger`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                if (response.status === 401) {
+                    window.location.href = 'login.html';
+                    return;
+                }
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to trigger emergency');
+                }
+
+                // Display AI assessment
+                displayAssessment(data);
+
+                emergencyId = data.emergency.id;
+
+                // Hide trigger buttons
+                document.getElementById('trigger-buttons').style.display = 'none';
+
+            } catch (error) {
+                console.error('Error triggering emergency:', error);
+                showAlert(error.message, 'error');
+
+                triggerBtn.disabled = false;
+                triggerBtn.innerHTML = '🚨 Trigger Emergency';
+            }
+        }
+
+        // Display AI assessment
+        function displayAssessment(data) {
+            const assessmentContainer = document.getElementById('assessment-container');
+            const { emergency, assessment } = data;
+
+            assessmentContainer.innerHTML = `
+                <div class="alert alert-success">
+                    ✅ Emergency triggered successfully! Help is on the way.
+                </div>
+
+                <div class="assessment-result">
+                    <div class="assessment-header">
+                        <h3>🤖 AI Assessment</h3>
+                        <span class="severity-indicator severity-${emergency.severity || 3}">
+                            Severity Level ${emergency.severity || 'Unknown'}
+                        </span>
+                    </div>
+
+                    <div class="assessment-field">
+                        <label>Emergency Type</label>
+                        <div class="value">${emergency.emergency_type || 'Under Assessment'}</div>
+                    </div>
+
+                    <div class="assessment-field">
+                        <label>Recommended Response</label>
+                        <div class="value">${assessment?.recommended_response || 'Emergency services have been notified'}</div>
+                    </div>
+
+                    ${assessment?.immediate_actions ? `
+                        <div class="assessment-field">
+                            <label>Immediate Actions</label>
+                            <div class="value">${assessment.immediate_actions}</div>
+                        </div>
+                    ` : ''}
+
+                    ${assessment?.resource_requirements ? `
+                        <div class="assessment-field">
+                            <label>Resources Required</label>
+                            <div class="value">${assessment.resource_requirements}</div>
+                        </div>
+                    ` : ''}
+                </div>
+
+                <div class="btn-group">
+                    <button class="btn-secondary" onclick="window.location.href='dashboard.html'">
+                        Back to Dashboard
+                    </button>
+                    <button class="btn-primary" onclick="window.location.href='emergency.html?id=${emergencyId}'">
+                        View Emergency Details
+                    </button>
+                </div>
+            `;
+
+            // Mark step 3 as completed
+            document.getElementById('step3').classList.remove('active');
+            document.getElementById('step3').classList.add('completed');
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            checkAuth();
+            getUserLocation();
+
+            // Next button for step 1
+            document.getElementById('btn-next-1').addEventListener('click', nextStep);
+        });
+    </script>
+</body>
+</html>
