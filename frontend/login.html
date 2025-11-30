@@ -329,6 +329,11 @@
                     throw new Error(data.message || 'Login failed');
                 }
 
+                // Validate response has session data
+                if (!data.session || !data.session.access_token) {
+                    throw new Error('Invalid response from server: missing session data');
+                }
+
                 // Store session
                 localStorage.setItem('access_token', data.session.access_token);
                 localStorage.setItem('refresh_token', data.session.refresh_token);
@@ -377,6 +382,11 @@
 
                 if (!response.ok) {
                     throw new Error(data.message || 'Signup failed');
+                }
+
+                // Validate response has session data
+                if (!data.session || !data.session.access_token) {
+                    throw new Error('Invalid response from server: missing session data');
                 }
 
                 // Store session
