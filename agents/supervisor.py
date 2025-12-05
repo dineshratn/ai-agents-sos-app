@@ -35,12 +35,14 @@ def supervisor_agent(state: EmergencyState) -> EmergencyState:
     1. If situation not assessed → SITUATION_AGENT (always first)
     2. If no guidance provided → GUIDANCE_AGENT
     3. If no resources coordinated → RESOURCE_AGENT (optional for low severity)
-    4. If all done → FINISH
+    4. If no communication sent → COMMUNICATION_AGENT (if family contacts exist)
+    5. If all done → FINISH
     """
     start_time = time.time()
     agents_called = state.get('agents_called', [])
     emergency_type = state.get('emergency_type')
     severity = state.get('severity', 3)
+    family_contacts = state.get('family_contacts', [])
 
     # Add execution trace
     execution_trace = state.get('execution_trace', [])
@@ -63,8 +65,13 @@ def supervisor_agent(state: EmergencyState) -> EmergencyState:
             next_agent = AgentNames.RESOURCE
             reason = f"Resource coordination needed (severity {severity})"
         else:
-            next_agent = AgentNames.END
-            reason = "Low severity - resources not needed"
+            next_agent = AgentNames.COMMUNICATION if family_contacts else AgentNames.END
+            reason = "Low severity - skip resources, check communication" if family_contacts else "Low severity - all done"
+
+    elif AgentNames.COMMUNICATION not in agents_called and family_contacts:
+        # Communication only if family contacts provided
+        next_agent = AgentNames.COMMUNICATION
+        reason = f"Prepare family communication (contacts: {len(family_contacts)} )"
 
     else:
         # All agents consulted
@@ -100,7 +107,7 @@ def supervisor_agent(state: EmergencyState) -> EmergencyState:
     return state
 
 
-def route_to_next_agent(state: EmergencyState) -> Literal["situation_agent", "guidance_agent", "resource_agent", "end"]:
+def route_to_next_agent(state: EmergencyState) -> Literal["situation_agent", "guidance_agent", "resource_agent", "communication_agent", "end"]:
     """
     Conditional edge function that determines which agent to call next.
 

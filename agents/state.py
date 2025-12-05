@@ -17,6 +17,7 @@ class EmergencyState(TypedDict):
     # Input from user
     description: str
     location: Optional[str]
+    family_contacts: Optional[List[Dict[str, str]]]  # [{name, relation, phone?}] for communication
 
     # Routing and orchestration
     next_agent: Optional[str]  # Which agent to call next
@@ -39,6 +40,10 @@ class EmergencyState(TypedDict):
     additional_resources: Optional[List[str]]
     resource_confidence: Optional[float]  # Phase 4: Confidence score (0-5)
 
+    # Communication Agent outputs
+    family_messages: Optional[List[Dict[str, str]]]  # [{name, relation, sms, whatsapp}]
+    communication_confidence: Optional[float]  # Phase 4: Confidence score (0-5)
+
     # Metadata
     assessment_complete: bool  # Flag to end the workflow
     total_tokens: int  # Track token usage across all agents
@@ -56,4 +61,5 @@ class AgentNames:
     SITUATION = "situation_agent"
     GUIDANCE = "guidance_agent"
     RESOURCE = "resource_agent"
+    COMMUNICATION = "communication_agent"
     END = "end"
